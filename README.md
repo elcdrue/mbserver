@@ -245,3 +245,89 @@ To check for race conditions, run:
 ```
 go test --race
 ```
+
+Slave app with command flags 
+```
+package main
+
+import (
+	"flag"
+	"github.com/elcdrue/mbserver"
+	"github.com/goburrow/serial"
+	"log"
+	"strconv"
+	"time"
+)
+
+var iLowerID, iUpperID, iTcpPort, iComPort, iBaudRate, iDataBits, iStopBits, iParity, iTimeOut int
+var sIp string
+
+func main() {
+	/*
+		err := s.ListenRTU(&serial.Config{
+			Address:  "/dev/ttyUSB0",
+			BaudRate: 115200,
+			DataBits: 8,
+			StopBits: 1,
+			Parity:   "N",
+			Timeout:  10 * time.Second})
+		if err != nil {
+			t.Fatalf("failed to listen, got %v\n", err)
+		}
+	*/
+	flag.StringVar(&sIp, "ip", "0.0.0.0", "listen on ip")
+	flag.IntVar(&iLowerID, "lower", 1, "Lower Slave Unit ID")
+	flag.IntVar(&iUpperID, "upper", 1, "Upper Slave Unit ID")
+	flag.IntVar(&iTcpPort, "tcp", 502, "Listen on TCP port num")
+	flag.IntVar(&iComPort, "com", 0, "Listen on Com port num")
+	flag.IntVar(&iBaudRate, "baudrate", 19200, "Baudrate of com port")
+	flag.IntVar(&iDataBits, "databits", 8, "Databits of com port")
+	flag.IntVar(&iStopBits, "stopbits", 1, "stopbits of com port")
+	flag.IntVar(&iParity, "parity", 0, "Parity, 0=none, 1=odd, 2=even")
+	flag.IntVar(&iTimeOut, "timeout", 10, "timeout in seconds")
+	flag.Parse()
+
+	var lowerID byte = byte(iLowerID)
+	var upperID byte = byte(iUpperID)
+
+	serv := mbserver.NewServer(lowerID, upperID)
+	tcpPort := strconv.Itoa(iTcpPort)
+
+	if iComPort > 0 {
+		var strParity string
+		strComPort := strconv.Itoa(iComPort)
+
+		switch iParity {
+		case 0:
+			strParity = "N"
+		case 1:
+			strParity = "O"
+		case 2:
+			strParity = "E"
+
+		}
+
+		err := serv.ListenRTU(&serial.Config{
+			Address:  "/dev/ttyUSB" + strComPort,
+			BaudRate: iBaudRate,
+			DataBits: iDataBits,
+			StopBits: iStopBits,
+			Parity:   strParity,
+			Timeout:  time.Duration(iTimeOut) * time.Second})
+		if err != nil {
+			log.Fatalf("failed to listen, got %v\n", err)
+		}
+	}
+
+	err := serv.ListenTCP("0.0.0.0:" + tcpPort)
+	if err != nil {
+		log.Fatalf("%v\n", err)
+	}
+	defer serv.Close()
+
+	// Wait forever
+	for {
+		time.Sleep(1 * time.Second)
+	}
+}
+```
