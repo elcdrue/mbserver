@@ -72,6 +72,11 @@ func (frame *RTUFrame) GetData() []byte {
 	return frame.Data
 }
 
+// GetAddress returns the Modbus Slave Unit ID
+func (frame *RTUFrame) GetAddress() byte {
+	return frame.Address
+}
+
 // SetData sets the RTUFrame Data byte field and updates the frame length
 // accordingly.
 func (frame *RTUFrame) SetData(data []byte) {

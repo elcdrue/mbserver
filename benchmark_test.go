@@ -31,7 +31,8 @@ func serverClientSetup() *serverClient {
 	setup := &serverClient{}
 
 	// Server
-	setup.slave = NewServer()
+	var LowerID, UppperID byte = 1, 1
+	setup.slave = NewServer(LowerID, UppperID)
 	addr := getFreePort()
 	go setup.slave.ListenTCP(addr)
 
@@ -40,6 +41,7 @@ func serverClientSetup() *serverClient {
 
 	// Client
 	setup.clientTCPHandler = modbus.NewTCPClientHandler(addr)
+	setup.clientTCPHandler.SlaveId = 1
 	// Connect manually so that multiple requests are handled in one connection session
 	setup.err = setup.clientTCPHandler.Connect()
 	if setup.err != nil {
@@ -139,7 +141,8 @@ func BenchmarkModbusRead125HoldingRegisters(b *testing.B) {
 // Start a Modbus server and use a client to write to and read from the serer.
 func Example() {
 	// Start the server.
-	serv := NewServer()
+	var LowerID, UppperID byte = 1, 1
+	serv := NewServer(LowerID, UppperID)
 	err := serv.ListenTCP("127.0.0.1:1502")
 	if err != nil {
 		log.Printf("%v\n", err)
@@ -152,6 +155,7 @@ func Example() {
 
 	// Connect a client.
 	handler := modbus.NewTCPClientHandler("localhost:1502")
+	handler.SlaveId = 1
 	err = handler.Connect()
 	if err != nil {
 		log.Printf("%v\n", err)
@@ -179,7 +183,8 @@ func Example() {
 
 // Override the default ReadDiscreteInputs funtion.
 func ExampleServer_RegisterFunctionHandler() {
-	serv := NewServer()
+	var LowerID, UpperID byte = 1, 1
+	serv := NewServer(LowerID, UpperID)
 
 	// Override ReadDiscreteInputs function.
 	serv.RegisterFunctionHandler(2,
@@ -195,7 +200,7 @@ func ExampleServer_RegisterFunctionHandler() {
 			}
 			data := make([]byte, 1+dataSize)
 			data[0] = byte(dataSize)
-			for i := range s.DiscreteInputs[register:endRegister] {
+			for i := range s.slaves[0].DiscreteInputs[register:endRegister] {
 				// Return all 1s, regardless of the value in the DiscreteInputs array.
 				shift := uint(i) % 8
 				data[1+i/8] |= byte(1 << shift)
@@ -216,6 +221,7 @@ func ExampleServer_RegisterFunctionHandler() {
 
 	// Connect a client.
 	handler := modbus.NewTCPClientHandler("localhost:4321")
+	handler.SlaveId = 1
 	err = handler.Connect()
 	if err != nil {
 		log.Printf("%v\n", err)

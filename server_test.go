@@ -30,10 +30,12 @@ func TestAduSetDataWithRegisterAndNumberAndValues(t *testing.T) {
 }
 
 func TestUnsupportedFunction(t *testing.T) {
-	s := NewServer()
+	var LowerID, UpperID byte = 255, 255
+	s := NewServer(LowerID, UpperID)
+
 	var frame TCPFrame
 	frame.Function = 255
-
+	frame.Device = 255
 	var req Request
 	req.frame = &frame
 	response := s.handle(&req)
@@ -45,7 +47,9 @@ func TestUnsupportedFunction(t *testing.T) {
 
 func TestModbus(t *testing.T) {
 	// Server
-	s := NewServer()
+	var LowerID, UpperID byte = 1, 1
+	s := NewServer(LowerID, UpperID)
+
 	err := s.ListenTCP("127.0.0.1:3333")
 	if err != nil {
 		t.Fatalf("failed to listen, got %v\n", err)
@@ -57,6 +61,7 @@ func TestModbus(t *testing.T) {
 
 	// Client
 	handler := modbus.NewTCPClientHandler("127.0.0.1:3333")
+	handler.SlaveId = 1
 	// Connect manually so that multiple requests are handled in one connection session
 	err = handler.Connect()
 	if err != nil {
@@ -64,6 +69,7 @@ func TestModbus(t *testing.T) {
 		t.FailNow()
 	}
 	defer handler.Close()
+
 	client := modbus.NewClient(handler)
 
 	// Coils
@@ -123,8 +129,8 @@ func TestModbus(t *testing.T) {
 	}
 
 	// Input registers
-	s.InputRegisters[65530] = 1
-	s.InputRegisters[65535] = 65535
+	s.slaves[0].InputRegisters[65535] = 65535
+	s.slaves[0].InputRegisters[65530] = 1
 	results, err = client.ReadInputRegisters(65530, 6)
 	if err != nil {
 		t.Errorf("expected nil, got %v\n", err)

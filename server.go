@@ -12,13 +12,19 @@ import (
 // Server is a Modbus slave with allocated memory for discrete inputs, coils, etc.
 type Server struct {
 	// Debug enables more verbose messaging.
-	Debug            bool
-	listeners        []net.Listener
-	ports            []serial.Port
-	portsWG          sync.WaitGroup
-	portsCloseChan   chan struct{}
-	requestChan      chan *Request
-	function         [256](func(*Server, Framer) ([]byte, *Exception))
+	Debug          bool
+	listeners      []net.Listener
+	ports          []serial.Port
+	portsWG        sync.WaitGroup
+	portsCloseChan chan struct{}
+	requestChan    chan *Request
+	function       [256](func(*Server, Framer) ([]byte, *Exception))
+	slaves         []SlaveMemory
+	lowerSlaveId   byte
+	upperSlaveId   byte
+}
+
+type SlaveMemory struct {
 	DiscreteInputs   []byte
 	Coils            []byte
 	HoldingRegisters []uint16
@@ -32,14 +38,24 @@ type Request struct {
 }
 
 // NewServer creates a new Modbus server (slave).
-func NewServer() *Server {
+func NewServer(LowerID, UpperID byte) *Server {
+	var i byte
 	s := &Server{}
+	s.lowerSlaveId = LowerID
+	s.upperSlaveId = UpperID
+
+	length := s.upperSlaveId - s.lowerSlaveId + 1
+	slaves := make([]SlaveMemory, length)
 
 	// Allocate Modbus memory maps.
-	s.DiscreteInputs = make([]byte, 65536)
-	s.Coils = make([]byte, 65536)
-	s.HoldingRegisters = make([]uint16, 65536)
-	s.InputRegisters = make([]uint16, 65536)
+	for i = 0; i < length; i++ {
+		slaves[i].DiscreteInputs = make([]byte, 65536)
+		slaves[i].Coils = make([]byte, 65536)
+		slaves[i].HoldingRegisters = make([]uint16, 65536)
+		slaves[i].InputRegisters = make([]uint16, 65536)
+	}
+
+	s.slaves = slaves
 
 	// Add default functions.
 	s.function[1] = ReadCoils
@@ -68,10 +84,13 @@ func (s *Server) handle(request *Request) Framer {
 	var exception *Exception
 	var data []byte
 
+	slaveId := request.frame.GetAddress()
 	response := request.frame.Copy()
-
 	function := request.frame.GetFunction()
-	if s.function[function] != nil {
+
+	if slaveId < s.lowerSlaveId || slaveId > s.upperSlaveId {
+		return nil
+	} else if s.function[function] != nil {
 		data, exception = s.function[function](s, request.frame)
 		response.SetData(data)
 	} else {
@@ -90,7 +109,9 @@ func (s *Server) handler() {
 	for {
 		request := <-s.requestChan
 		response := s.handle(request)
-		request.conn.Write(response.Bytes())
+		if response != nil {
+			request.conn.Write(response.Bytes())
+		}
 	}
 }
 
