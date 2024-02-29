@@ -22,6 +22,15 @@ type Server struct {
 	slaves         []SlaveMemory
 	lowerSlaveId   byte
 	upperSlaveId   byte
+	ListenState
+}
+
+type ListenState struct {
+	state     int
+	bytesLeft int
+	buffer    []byte
+	packet    []byte
+	hasErr    bool
 }
 
 type SlaveMemory struct {
@@ -66,6 +75,12 @@ func NewServer(LowerID, UpperID byte) *Server {
 	s.function[6] = WriteHoldingRegister
 	s.function[15] = WriteMultipleCoils
 	s.function[16] = WriteHoldingRegisters
+
+	ls := ListenState{}
+	ls.buffer = make([]byte, 256)
+	ls.hasErr = false
+	ls.bytesLeft = 0
+	s.ListenState = ls
 
 	s.requestChan = make(chan *Request)
 	s.portsCloseChan = make(chan struct{})
