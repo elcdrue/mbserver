@@ -2,11 +2,10 @@
 package mbserver
 
 import (
+	"go.bug.st/serial"
 	"io"
 	"net"
 	"sync"
-
-	"github.com/goburrow/serial"
 )
 
 // Server is a Modbus slave with allocated memory for discrete inputs, coils, etc.
