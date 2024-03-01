@@ -1,0 +1,2 @@
+Delete memory allocation on input registers and discrete register (write restriction). 
+Use memory from holding registers and coils.
