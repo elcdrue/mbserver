@@ -22,17 +22,17 @@ func GetException(frame Framer) (exception Exception) {
 	return exception
 }
 
-func registerAddressAndNumber(frame Framer) (register int, numRegs int, endRegister int) {
+func registerAddressAndNumber(frame Framer) (register uint16, numRegs uint16, endRegister uint16) {
 	data := frame.GetData()
-	register = int(binary.BigEndian.Uint16(data[0:2]))
-	numRegs = int(binary.BigEndian.Uint16(data[2:4]))
+	register = binary.BigEndian.Uint16(data[0:2])
+	numRegs = binary.BigEndian.Uint16(data[2:4])
 	endRegister = register + numRegs
 	return register, numRegs, endRegister
 }
 
-func registerAddressAndValue(frame Framer) (int, uint16) {
+func registerAddressAndValue(frame Framer) (uint16, uint16) {
 	data := frame.GetData()
-	register := int(binary.BigEndian.Uint16(data[0:2]))
+	register := binary.BigEndian.Uint16(data[0:2])
 	value := binary.BigEndian.Uint16(data[2:4])
 	return register, value
 }

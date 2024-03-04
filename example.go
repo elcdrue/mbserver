@@ -26,6 +26,7 @@ func main() {
 	flag.IntVar(&iDataBits, "databits", 8, "Databits of com port")
 	flag.IntVar(&iStopBits, "stopbits", 1, "stopbits of com port")
 	flag.IntVar(&iParity, "parity", 0, "Parity, 0=none, 1=odd, 2=even")
+	flag.IntVar(&OffsetInput, "ofs", 10000, "Offset of holding register copy it to input")
 	flag.Parse()
 
 	var lowerID byte = byte(iLowerID)

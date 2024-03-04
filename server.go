@@ -11,16 +11,18 @@ import (
 // Server is a Modbus slave with allocated memory for discrete inputs, coils, etc.
 type Server struct {
 	// Debug enables more verbose messaging.
-	Debug          bool
-	listeners      []net.Listener
-	ports          []serial.Port
-	portsWG        sync.WaitGroup
-	portsCloseChan chan struct{}
-	requestChan    chan *Request
-	function       [256](func(*Server, Framer) ([]byte, *Exception))
-	slaves         []SlaveMemory
-	lowerSlaveId   byte
-	upperSlaveId   byte
+	Debug                bool
+	listeners            []net.Listener
+	ports                []serial.Port
+	portsWG              sync.WaitGroup
+	portsCloseChan       chan struct{}
+	requestChan          chan *Request
+	function             [256](func(*Server, Framer) ([]byte, *Exception))
+	slaves               []SlaveMemory
+	lowerSlaveId         byte
+	upperSlaveId         byte
+	offsetInputRegisters uint16 // offset to copy from HR to IR
+	offsetDiscreteInputs uint16 // offset to copy from Coils to DI
 	ListenState
 }
 
@@ -46,11 +48,13 @@ type Request struct {
 }
 
 // NewServer creates a new Modbus server (slave).
-func NewServer(LowerID, UpperID byte) *Server {
+func NewServer(LowerID, UpperID byte, OffsetInputRegisters uint16, OffsetDiscreteInputs uint16) *Server {
 	var i byte
 	s := &Server{}
 	s.lowerSlaveId = LowerID
 	s.upperSlaveId = UpperID
+	s.offsetInputRegisters = OffsetInputRegisters
+	s.offsetDiscreteInputs = OffsetDiscreteInputs
 
 	length := s.upperSlaveId - s.lowerSlaveId + 1
 	slaves := make([]SlaveMemory, length)

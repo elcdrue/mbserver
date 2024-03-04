@@ -2,6 +2,7 @@ package mbserver
 
 import (
 	"encoding/binary"
+	"log"
 )
 
 // ReadCoils function 1, reads coils from internal memory.
@@ -53,7 +54,7 @@ func ReadDiscreteInputs(s *Server, frame Framer) ([]byte, *Exception) {
 // ReadHoldingRegisters function 3, reads holding registers from internal memory.
 func ReadHoldingRegisters(s *Server, frame Framer) ([]byte, *Exception) {
 	register, numRegs, endRegister := registerAddressAndNumber(frame)
-	if endRegister > 65536 {
+	if endRegister > 65535 {
 		return []byte{}, &IllegalDataAddress
 	}
 	slaveID := frame.GetAddress()
@@ -64,7 +65,7 @@ func ReadHoldingRegisters(s *Server, frame Framer) ([]byte, *Exception) {
 // ReadInputRegisters function 4, reads input registers from internal memory.
 func ReadInputRegisters(s *Server, frame Framer) ([]byte, *Exception) {
 	register, numRegs, endRegister := registerAddressAndNumber(frame)
-	if endRegister > 65536 {
+	if endRegister > 65535 {
 		return []byte{}, &IllegalDataAddress
 	}
 	slaveID := frame.GetAddress()
@@ -82,6 +83,11 @@ func WriteSingleCoil(s *Server, frame Framer) ([]byte, *Exception) {
 	slaveID := frame.GetAddress()
 	idx := s.upperSlaveId - slaveID
 	s.slaves[idx].Coils[register] = byte(value)
+	// copy to di from coils with offset
+	if register >= s.offsetDiscreteInputs {
+		s.slaves[idx].DiscreteInputs[register-s.offsetDiscreteInputs] = byte(value)
+	}
+
 	return frame.GetData()[0:4], &Success
 }
 
@@ -91,6 +97,11 @@ func WriteHoldingRegister(s *Server, frame Framer) ([]byte, *Exception) {
 	slaveID := frame.GetAddress()
 	idx := s.upperSlaveId - slaveID
 	s.slaves[idx].HoldingRegisters[register] = value
+	// copy value from holding register with offset
+	if uint16(register) >= s.offsetInputRegisters {
+		s.slaves[idx].InputRegisters[register-s.offsetInputRegisters] = value
+	}
+
 	return frame.GetData()[0:4], &Success
 }
 
@@ -99,7 +110,7 @@ func WriteMultipleCoils(s *Server, frame Framer) ([]byte, *Exception) {
 	register, numRegs, endRegister := registerAddressAndNumber(frame)
 	valueBytes := frame.GetData()[5:]
 
-	if endRegister > 65536 {
+	if endRegister > 65535 {
 		return []byte{}, &IllegalDataAddress
 	}
 
@@ -109,10 +120,13 @@ func WriteMultipleCoils(s *Server, frame Framer) ([]byte, *Exception) {
 	//}
 	slaveID := frame.GetAddress()
 	idx := s.upperSlaveId - slaveID
-	bitCount := 0
+	var bitCount uint16 = 0
 	for i, value := range valueBytes {
-		for bitPos := uint(0); bitPos < 8; bitPos++ {
-			s.slaves[idx].Coils[register+(i*8)+int(bitPos)] = bitAtPosition(value, bitPos)
+		for bitPos := uint16(0); bitPos < 8; bitPos++ {
+			s.slaves[idx].Coils[register+uint16(i*8)+bitPos] = bitAtPosition(value, bitPos)
+			if s.offsetDiscreteInputs <= register+uint16(i*8)+bitPos {
+				s.slaves[idx].DiscreteInputs[register+uint16(i*8)+bitPos-s.offsetDiscreteInputs] = bitAtPosition(value, bitPos)
+			}
 			bitCount++
 			if bitCount >= numRegs {
 				break
@@ -133,7 +147,7 @@ func WriteHoldingRegisters(s *Server, frame Framer) ([]byte, *Exception) {
 	var exception *Exception
 	var data []byte
 
-	if len(valueBytes)/2 != numRegs {
+	if uint16(len(valueBytes)/2) != numRegs {
 		exception = &IllegalDataAddress
 	}
 	slaveID := frame.GetAddress()
@@ -141,7 +155,15 @@ func WriteHoldingRegisters(s *Server, frame Framer) ([]byte, *Exception) {
 	// Copy data to memory
 	values := BytesToUint16(valueBytes)
 	valuesUpdated := copy(s.slaves[idx].HoldingRegisters[register:], values)
-	if valuesUpdated == numRegs {
+	// copy value from holding register with offset
+	if register >= s.offsetInputRegisters {
+		valuesUpdated1 := copy(s.slaves[idx].HoldingRegisters[register-s.offsetInputRegisters:], values)
+		if valuesUpdated != valuesUpdated1 {
+			log.Println("not succesfully copied holding register to input registers")
+		}
+	}
+
+	if uint16(valuesUpdated) == numRegs {
 		exception = &Success
 		data = frame.GetData()[0:4]
 	} else {
@@ -171,6 +193,6 @@ func Uint16ToBytes(values []uint16) []byte {
 	return bytes
 }
 
-func bitAtPosition(value uint8, pos uint) uint8 {
+func bitAtPosition(value uint8, pos uint16) uint8 {
 	return (value >> pos) & 0x01
 }
