@@ -8,7 +8,8 @@ import (
 // ReadCoils function 1, reads coils from internal memory.
 func ReadCoils(s *Server, frame Framer) ([]byte, *Exception) {
 	register, numRegs, endRegister := registerAddressAndNumber(frame)
-	if endRegister > 65535 {
+
+	if (int(register) + int(numRegs)) > 65536 {
 		return []byte{}, &IllegalDataAddress
 	}
 	dataSize := numRegs / 8
@@ -31,7 +32,8 @@ func ReadCoils(s *Server, frame Framer) ([]byte, *Exception) {
 // ReadDiscreteInputs function 2, reads discrete inputs from internal memory.
 func ReadDiscreteInputs(s *Server, frame Framer) ([]byte, *Exception) {
 	register, numRegs, endRegister := registerAddressAndNumber(frame)
-	if endRegister > 65535 {
+
+	if (int(register) + int(numRegs)) > 65536 {
 		return []byte{}, &IllegalDataAddress
 	}
 	dataSize := numRegs / 8
@@ -54,7 +56,7 @@ func ReadDiscreteInputs(s *Server, frame Framer) ([]byte, *Exception) {
 // ReadHoldingRegisters function 3, reads holding registers from internal memory.
 func ReadHoldingRegisters(s *Server, frame Framer) ([]byte, *Exception) {
 	register, numRegs, endRegister := registerAddressAndNumber(frame)
-	if endRegister > 65535 {
+	if (int(register) + int(numRegs)) > 65536 {
 		return []byte{}, &IllegalDataAddress
 	}
 	slaveID := frame.GetAddress()
@@ -65,7 +67,7 @@ func ReadHoldingRegisters(s *Server, frame Framer) ([]byte, *Exception) {
 // ReadInputRegisters function 4, reads input registers from internal memory.
 func ReadInputRegisters(s *Server, frame Framer) ([]byte, *Exception) {
 	register, numRegs, endRegister := registerAddressAndNumber(frame)
-	if endRegister > 65535 {
+	if (int(register) + int(numRegs)) > 65536 {
 		return []byte{}, &IllegalDataAddress
 	}
 	slaveID := frame.GetAddress()
@@ -107,10 +109,10 @@ func WriteHoldingRegister(s *Server, frame Framer) ([]byte, *Exception) {
 
 // WriteMultipleCoils function 15, writes holding registers to internal memory.
 func WriteMultipleCoils(s *Server, frame Framer) ([]byte, *Exception) {
-	register, numRegs, endRegister := registerAddressAndNumber(frame)
+	register, numRegs, _ := registerAddressAndNumber(frame)
 	valueBytes := frame.GetData()[5:]
 
-	if endRegister > 65535 {
+	if (int(register) + int(numRegs)) > 65536 {
 		return []byte{}, &IllegalDataAddress
 	}
 
@@ -147,7 +149,7 @@ func WriteHoldingRegisters(s *Server, frame Framer) ([]byte, *Exception) {
 	var exception *Exception
 	var data []byte
 
-	if uint16(len(valueBytes)/2) != numRegs {
+	if uint16(len(valueBytes)/2) != numRegs || (int(register)+int(numRegs)) > 65535 {
 		exception = &IllegalDataAddress
 	}
 	slaveID := frame.GetAddress()
@@ -156,8 +158,8 @@ func WriteHoldingRegisters(s *Server, frame Framer) ([]byte, *Exception) {
 	values := BytesToUint16(valueBytes)
 	valuesUpdated := copy(s.slaves[idx].HoldingRegisters[register:], values)
 	// copy value from holding register with offset
-	if register >= s.offsetInputRegisters {
-		valuesUpdated1 := copy(s.slaves[idx].HoldingRegisters[register-s.offsetInputRegisters:], values)
+	if register >= s.offsetInputRegisters && exception != &IllegalDataAddress {
+		valuesUpdated1 := copy(s.slaves[idx].InputRegisters[register-s.offsetInputRegisters:], values)
 		if valuesUpdated != valuesUpdated1 {
 			log.Println("not succesfully copied holding register to input registers")
 		}

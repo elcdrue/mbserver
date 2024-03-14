@@ -2,7 +2,6 @@ package mbserver
 
 import (
 	"go.bug.st/serial"
-	"io"
 	"log"
 	"time"
 )
@@ -20,7 +19,7 @@ func (s *Server) ListenRTU(name string, mode *serial.Mode) (err error) {
 		log.Print(err)
 	}
 
-	err = port.SetReadTimeout(1 * time.Millisecond)
+	err = port.SetReadTimeout(5 * time.Millisecond)
 	if err != nil {
 		log.Print(err)
 	}
@@ -43,13 +42,13 @@ var buffer []byte
 
 func (s *Server) acceptSerialRequests(port serial.Port) {
 	const (
-		SERIAL_RECV_INIT  = iota // flush all incoming data from serial port on init or err
-		SERIAL_RECV_START        // try to read 8 start bytes of frame
-		SERIAL_RECV_END          // if frame length greater than 8 bytes try to read more bytes
-		SERIAL_RECV_RET          // return of reconstructed frame to check data and prepare response
+		InitialState = iota // receive all incoming data from serial port on init or err
+		ReceiveState        // try to read byte stream from port before timeout
+		ControlState        // return of reconstructed frame to check data and prepare response
 	)
 
 	var bytesRead int
+	var hasReceivedData bool
 	var err error
 
 	for {
@@ -61,118 +60,52 @@ func (s *Server) acceptSerialRequests(port serial.Port) {
 
 		switch s.ListenState.state {
 
-		case SERIAL_RECV_INIT:
-
+		case InitialState:
 			s.ListenState.hasErr = false
 			bytesRead, err = port.Read(buffer)
 
 			if err != nil {
-				log.Print("SERIAL_RECV_INIT err", err)
+				log.Print("InitialState err", err)
 			}
 
 			if bytesRead == 0 {
-				s.ListenState.state = SERIAL_RECV_START
+				hasReceivedData = false
+				s.ListenState.state = ReceiveState
 				continue
 			}
 
-		case SERIAL_RECV_START:
+		case ReceiveState:
 
-			s.ListenState.bytesLeft = 0
-			s.ListenState.packet = []byte{}
-			bytesRead, err := io.ReadFull(port, buffer[0:8])
-			if err != nil {
-				log.Print("SERIAL_RECV_START err", err)
+			if !hasReceivedData {
+				s.ListenState.packet = []byte{}
 			}
 
-			if bytesRead == 8 {
+			bytesRead, err := port.Read(buffer)
+			if err != nil {
+				log.Print("Receive state err", err)
+			}
 
+			// go to check received data
+			if bytesRead == 0 && hasReceivedData {
+				s.ListenState.state = ControlState
+
+				// append received data to buffer
+			} else if bytesRead > 0 {
+				hasReceivedData = true
 				s.ListenState.packet = append(s.ListenState.packet, buffer[0:bytesRead]...)
-				switch {
-				/*	slave id not specified,
-					maybe need implement broadcast requests? */
-				case buffer[00] == 0:
-					s.ListenState.state = SERIAL_RECV_INIT
-
-				/* request length is 8 bytes
-				buffer[00] = slaveId
-				buffer[01] = function code
-				buffer[02] = start register hi
-				buffer[03] = start register lo
-				buffer[04] = size of registers hi
-				buffer[05] = size of registers lo
-				buffer[06] = crc hi
-				buffer[07] = crc lo
-				*/
-
-				case buffer[01] == 0x01, buffer[01] == 0x02, buffer[01] == 0x03, buffer[01] == 0x04,
-					buffer[01] == 0x05, buffer[01] == 0x06:
-
-					s.ListenState.bytesLeft = 0
-					s.ListenState.state = SERIAL_RECV_RET
-
-				/* request length is greater than 8 bytes up to 256 bytes
-				buffer[00] = slaveId
-				buffer[01] = function code
-				buffer[02] = start register hi
-				buffer[03] = start register lo
-				buffer[04] = size of registers hi
-				buffer[05] = size of registers lo
-				buffer[06] = size of bytes data (x)
-				buffer[06..06+x] = size of bytes data
-				buffer[06+x+1] = crc hi
-				buffer[06+x+2] = crc lo
-				*/
-				case buffer[01] == 0x0F, buffer[01] == 0x10:
-					s.ListenState.bytesLeft = int(buffer[06]) + 1
-					s.ListenState.state = SERIAL_RECV_END
-
-				// got err.. non-implemented function?
-				default:
-					s.ListenState.state = SERIAL_RECV_INIT
-				}
 			}
 
-		case SERIAL_RECV_END:
+		case ControlState:
 
-			bytesRead, err = port.Read(s.ListenState.buffer)
-			if err != nil {
-				log.Print("SERIAL_RECV_END error", err)
-			}
-
-			// read more bytes
-			if bytesRead > 0 {
-				// but not full request
-				if s.ListenState.bytesLeft > bytesRead {
-					s.ListenState.packet = append(s.ListenState.packet, s.ListenState.buffer[:bytesRead]...)
-					s.ListenState.bytesLeft -= bytesRead
-					// read full request
-				} else {
-
-					s.ListenState.packet = append(s.ListenState.packet, s.ListenState.buffer[:s.ListenState.bytesLeft]...)
-					s.ListenState.state = SERIAL_RECV_RET
-
-					// if read more bytes than length of frame
-					//  serial port is need flush incoming data
-					s.ListenState.hasErr = bytesRead > s.ListenState.bytesLeft
-				}
-			}
-		case SERIAL_RECV_RET:
-			if s.ListenState.hasErr {
-				s.ListenState.state = SERIAL_RECV_INIT
-			} else {
-				s.ListenState.state = SERIAL_RECV_START
-			}
-
+			hasReceivedData = false
 			// check frame and build response
 			frame, err := NewRTUFrame(s.ListenState.packet)
 			if err != nil {
-				log.Printf("bad serial frame error %v\n", err)
-				//The next line prevents RTU server from exiting when it receives a bad frame. Simply discard the erroneous
-				//frame and wait for next frame by jumping back to the beginning of the 'for' loop.
-				log.Printf("Keep the RTU server running!!\n")
-				return
+				s.ListenState.state = InitialState
+				continue
 			}
-
+			s.ListenState.state = ReceiveState
+			hasReceivedData = false
 			// write request to the channel
 			request := &Request{port, frame}
 			s.requestChan <- request

@@ -32,7 +32,7 @@ func serverClientSetup() *serverClient {
 
 	// Server
 	var LowerID, UppperID byte = 1, 1
-	setup.slave = NewServer(LowerID, UppperID)
+	setup.slave = NewServer(LowerID, UppperID, 30000, 30000)
 	addr := getFreePort()
 	go setup.slave.ListenTCP(addr)
 
@@ -142,7 +142,7 @@ func BenchmarkModbusRead125HoldingRegisters(b *testing.B) {
 func Example() {
 	// Start the server.
 	var LowerID, UppperID byte = 1, 1
-	serv := NewServer(LowerID, UppperID)
+	serv := NewServer(LowerID, UppperID, 30000, 30000)
 	err := serv.ListenTCP("127.0.0.1:1502")
 	if err != nil {
 		log.Printf("%v\n", err)
@@ -184,7 +184,7 @@ func Example() {
 // Override the default ReadDiscreteInputs funtion.
 func ExampleServer_RegisterFunctionHandler() {
 	var LowerID, UpperID byte = 1, 1
-	serv := NewServer(LowerID, UpperID)
+	serv := NewServer(LowerID, UpperID, 30000, 30000)
 
 	// Override ReadDiscreteInputs function.
 	serv.RegisterFunctionHandler(2,

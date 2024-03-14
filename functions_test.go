@@ -17,7 +17,7 @@ func isEqual(a interface{}, b interface{}) bool {
 // Function 1
 func TestReadCoils(t *testing.T) {
 	var LowerID, UpperID byte = 255, 255
-	s := NewServer(LowerID, UpperID)
+	s := NewServer(LowerID, UpperID, 30000, 30000)
 
 	// Set the coil values
 	s.slaves[0].Coils[10] = 1
@@ -53,7 +53,7 @@ func TestReadCoils(t *testing.T) {
 // Function 2
 func TestReadDiscreteInputs(t *testing.T) {
 	var LowerID, UpperID byte = 255, 255
-	s := NewServer(LowerID, UpperID)
+	s := NewServer(LowerID, UpperID, 30000, 30000)
 	// Set the discrete input values
 	s.slaves[0].DiscreteInputs[0] = 1
 	s.slaves[0].DiscreteInputs[7] = 1
@@ -87,7 +87,7 @@ func TestReadDiscreteInputs(t *testing.T) {
 // Function 3
 func TestReadHoldingRegisters(t *testing.T) {
 	var LowerID, UpperID byte = 255, 255
-	s := NewServer(LowerID, UpperID)
+	s := NewServer(LowerID, UpperID, 30000, 30000)
 	s.slaves[0].HoldingRegisters[100] = 1
 	s.slaves[0].HoldingRegisters[101] = 2
 	s.slaves[0].HoldingRegisters[102] = 65535
@@ -118,7 +118,7 @@ func TestReadHoldingRegisters(t *testing.T) {
 // Function 4
 func TestReadInputRegisters(t *testing.T) {
 	var LowerID, UpperID byte = 255, 255
-	s := NewServer(LowerID, UpperID)
+	s := NewServer(LowerID, UpperID, 30000, 30000)
 
 	s.slaves[0].InputRegisters[200] = 1
 	s.slaves[0].InputRegisters[201] = 2
@@ -150,7 +150,7 @@ func TestReadInputRegisters(t *testing.T) {
 // Function 5
 func TestWriteSingleCoil(t *testing.T) {
 	var LowerID, UpperID byte = 255, 255
-	s := NewServer(LowerID, UpperID)
+	s := NewServer(LowerID, UpperID, 30000, 30000)
 
 	var frame TCPFrame
 	frame.TransactionIdentifier = 1
@@ -178,7 +178,7 @@ func TestWriteSingleCoil(t *testing.T) {
 // Function 6
 func TestWriteHoldingRegister(t *testing.T) {
 	var LowerID, UpperID byte = 255, 255
-	s := NewServer(LowerID, UpperID)
+	s := NewServer(LowerID, UpperID, 30000, 30000)
 
 	var frame TCPFrame
 	frame.TransactionIdentifier = 1
@@ -206,7 +206,7 @@ func TestWriteHoldingRegister(t *testing.T) {
 // Function 15
 func TestWriteMultipleCoils(t *testing.T) {
 	var LowerID, UpperID byte = 255, 255
-	s := NewServer(LowerID, UpperID)
+	s := NewServer(LowerID, UpperID, 30000, 30000)
 
 	var frame TCPFrame
 	frame.TransactionIdentifier = 1
@@ -234,7 +234,7 @@ func TestWriteMultipleCoils(t *testing.T) {
 // Function 16
 func TestWriteHoldingRegisters(t *testing.T) {
 	var LowerID, UpperID byte = 255, 255
-	s := NewServer(LowerID, UpperID)
+	s := NewServer(LowerID, UpperID, 30000, 30000)
 
 	var frame TCPFrame
 	frame.TransactionIdentifier = 1
@@ -279,7 +279,8 @@ func TestUint16ToBytes(t *testing.T) {
 
 func TestOutOfBounds(t *testing.T) {
 	var LowerID, UpperID byte = 255, 255
-	s := NewServer(LowerID, UpperID)
+
+	s := NewServer(LowerID, UpperID, 30000, 30000)
 
 	var frame TCPFrame
 	frame.TransactionIdentifier = 1
@@ -317,7 +318,6 @@ func TestOutOfBounds(t *testing.T) {
 
 	// registers
 	SetDataWithRegisterAndNumber(&frame, 65535, 2)
-
 	frame.Function = 3
 	response = s.handle(&req)
 	exception = GetException(response)

@@ -31,7 +31,7 @@ func TestAduSetDataWithRegisterAndNumberAndValues(t *testing.T) {
 
 func TestUnsupportedFunction(t *testing.T) {
 	var LowerID, UpperID byte = 255, 255
-	s := NewServer(LowerID, UpperID)
+	s := NewServer(LowerID, UpperID, 30000, 30000)
 
 	var frame TCPFrame
 	frame.Function = 255
@@ -48,7 +48,7 @@ func TestUnsupportedFunction(t *testing.T) {
 func TestModbus(t *testing.T) {
 	// Server
 	var LowerID, UpperID byte = 1, 1
-	s := NewServer(LowerID, UpperID)
+	s := NewServer(LowerID, UpperID, 30000, 30000)
 
 	err := s.ListenTCP("127.0.0.1:3333")
 	if err != nil {

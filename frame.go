@@ -22,11 +22,11 @@ func GetException(frame Framer) (exception Exception) {
 	return exception
 }
 
-func registerAddressAndNumber(frame Framer) (register uint16, numRegs uint16, endRegister uint16) {
+func registerAddressAndNumber(frame Framer) (register uint16, numRegs uint16, endRegister uint32) {
 	data := frame.GetData()
 	register = binary.BigEndian.Uint16(data[0:2])
 	numRegs = binary.BigEndian.Uint16(data[2:4])
-	endRegister = register + numRegs
+	endRegister = uint32(register) + uint32(numRegs)
 	return register, numRegs, endRegister
 }
 
