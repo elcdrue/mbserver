@@ -1,9 +1,10 @@
 package mbserver
 
 import (
-	"go.bug.st/serial"
 	"log"
 	"time"
+
+	"go.bug.st/serial"
 )
 
 // ListenRTU starts the Modbus server listening to a serial device.
@@ -19,7 +20,7 @@ func (s *Server) ListenRTU(name string, mode *serial.Mode) (err error) {
 		log.Print(err)
 	}
 
-	err = port.SetReadTimeout(5 * time.Millisecond)
+	err = port.SetReadTimeout(20 * time.Millisecond)
 	if err != nil {
 		log.Print(err)
 	}
@@ -75,7 +76,6 @@ func (s *Server) acceptSerialRequests(port serial.Port) {
 			}
 
 		case ReceiveState:
-
 			if !hasReceivedData {
 				s.ListenState.packet = []byte{}
 			}
@@ -85,31 +85,25 @@ func (s *Server) acceptSerialRequests(port serial.Port) {
 				log.Print("Receive state err", err)
 			}
 
-			// go to check received data
 			if bytesRead == 0 && hasReceivedData {
 				s.ListenState.state = ControlState
 
-				// append received data to buffer
 			} else if bytesRead > 0 {
 				hasReceivedData = true
 				s.ListenState.packet = append(s.ListenState.packet, buffer[0:bytesRead]...)
 			}
 
 		case ControlState:
-
 			hasReceivedData = false
-			// check frame and build response
 			frame, err := NewRTUFrame(s.ListenState.packet)
 			if err != nil {
 				s.ListenState.state = InitialState
 				continue
 			}
-			s.ListenState.state = ReceiveState
-			hasReceivedData = false
-			// write request to the channel
+
 			request := &Request{port, frame}
 			s.requestChan <- request
-
+			s.ListenState.state = ReceiveState
 		}
 	}
 }
