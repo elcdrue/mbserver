@@ -20,7 +20,7 @@ func (s *Server) ListenRTU(name string, mode *serial.Mode) (err error) {
 		log.Print(err)
 	}
 
-	err = port.SetReadTimeout(20 * time.Millisecond)
+	err = port.SetReadTimeout(30 * time.Millisecond)
 	if err != nil {
 		log.Print(err)
 	}
