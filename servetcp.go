@@ -23,20 +23,36 @@ func (s *Server) accept(listen net.Listener) error {
 			defer conn.Close()
 
 			for {
-				packet := make([]byte, 512)
-				bytesRead, err := conn.Read(packet)
-				if err != nil {
-					if err != io.EOF {
-						log.Printf("read error %v\n", err)
+				// some devices may send multiple requests in one packet
+				// we need reassebmly frame bytes in two steps 
+				
+				// step 1 - read first 6 bytes 
+				frameStart := make([]byte, 6)
+				
+				_, err := conn.Read(frameStart)
+				if err != nil { 
+					if err != io.EOF { 
+						log.Printf("read frameStart error %v\n", err)
 					}
 					return
 				}
-				// Set the length of the packet to the number of read bytes.
-				packet = packet[:bytesRead]
 
+				// step 2 - read frameEnd with length specified in 6th byte of frameStart 
+				frameEnd := make([]byte, int(frameStart[5])) 
+				_, err = conn.Read(frameEnd)
+				if err != nil { 
+					if err != io.EOF { 
+						log.Printf("read frameEnd error %v\n", err)
+					}
+					return
+				}
+
+				// Set the length of the packet to the number of read bytes.
+				packet := append(frameStart, frameEnd...)
 				frame, err := NewTCPFrame(packet)
 				if err != nil {
 					log.Printf("bad packet error %v\n", err)
+					log.Printf("frame data: % x\n", packet)
 					return
 				}
 

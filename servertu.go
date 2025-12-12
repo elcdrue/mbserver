@@ -20,7 +20,7 @@ func (s *Server) ListenRTU(name string, mode *serial.Mode) (err error) {
 		log.Print(err)
 	}
 
-	err = port.SetReadTimeout(30 * time.Millisecond)
+	err = port.SetReadTimeout(100 * time.Millisecond)
 	if err != nil {
 		log.Print(err)
 	}
@@ -91,6 +91,13 @@ func (s *Server) acceptSerialRequests(port serial.Port) {
 			} else if bytesRead > 0 {
 				hasReceivedData = true
 				s.ListenState.packet = append(s.ListenState.packet, buffer[0:bytesRead]...)
+
+				if len(s.ListenState.packet) == 8 && (s.ListenState.packet[01] == 01 ||
+					s.ListenState.packet[01] == 02 ||
+					s.ListenState.packet[01] == 03 ||
+					s.ListenState.packet[01] == 04) {
+					s.ListenState.state = ControlState
+				}
 			}
 
 		case ControlState:
@@ -98,6 +105,7 @@ func (s *Server) acceptSerialRequests(port serial.Port) {
 			frame, err := NewRTUFrame(s.ListenState.packet)
 			if err != nil {
 				s.ListenState.state = InitialState
+				log.Printf("Received packet error: %s\nPACKET DATA: % x\n", err, s.ListenState.packet)
 				continue
 			}
 
