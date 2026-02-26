@@ -1,4 +1,4 @@
-module mbserver
+module github.com/elcdrue/mbserver
 
 go 1.19
 
