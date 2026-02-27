@@ -1,43 +1,58 @@
 package mbserver
 
-/*
-
-package main
-
 import (
 	"flag"
-	"github.com/elcdrue/mbserver"
-	"go.bug.st/serial"
+	"fmt"
 	"log"
 	"strconv"
 	"time"
+
+	"github.com/elcdrue/mbserver"
+	"go.bug.st/serial"
 )
 
-var iLowerID, iUpperID, iTcpPort, iComPort, iBaudRate, iDataBits, iStopBits, iParity, iTimeOut int
-var sIp string
+var iLowerID, iUpperID, iTcpPort, iBaudRate, iDataBits, iStopBits, iParity, iTimeOut int
+var ofs1, ofs2 int
+var sComPort, sIp, sFunction string
 
 func main() {
-	flag.StringVar(&sIp, "ip", "0.0.0.0", "listen on ip")
+	flag.StringVar(&sIp, "ip", "0.0.0.0", "Listen on IP")
 	flag.IntVar(&iLowerID, "lo", 1, "Lower Slave Unit ID")
 	flag.IntVar(&iUpperID, "up", 1, "Upper Slave Unit ID")
-	flag.IntVar(&iTcpPort, "port", 1502, "Listen on TCP port num")
-	flag.IntVar(&iComPort, "com", 0, "Listen on Com port num")
-	flag.IntVar(&iBaudRate, "speed", 19200, "Baudrate of com port")
-	flag.IntVar(&iDataBits, "databits", 8, "Databits of com port")
-	flag.IntVar(&iStopBits, "stopbits", 1, "stopbits of com port")
+	flag.IntVar(&iTcpPort, "port", 502, "Listen on TCP port")
+	flag.StringVar(&sComPort, "com", "", "Listen on COM port")
+	flag.IntVar(&iBaudRate, "speed", 19200, "Baudrate of COM port")
+	flag.IntVar(&iDataBits, "data", 8, "Databits of COM port")
+	flag.IntVar(&iStopBits, "stop", 1, "Stopbits of COM port")
 	flag.IntVar(&iParity, "parity", 0, "Parity, 0=none, 1=odd, 2=even")
-	flag.IntVar(&OffsetInput, "ofs", 10000, "Offset of holding register copy it to input")
+	flag.IntVar(&ofs1, "ofs1", 30000, "Offset to copy Holding registers to Input Registers")
+	flag.IntVar(&ofs2, "ofs2", 30000, "Offset to copy Coils to Discrete Inputs")
+
 	flag.Parse()
 
 	var lowerID byte = byte(iLowerID)
 	var upperID byte = byte(iUpperID)
 
-	serv := mbserver.NewServer(lowerID, upperID)
+	serv := mbserver.NewServer(lowerID, upperID, uint16(ofs1), uint16(ofs2))
 	tcpPort := strconv.Itoa(iTcpPort)
 
-	if iComPort != 444 {
+	if sComPort == "list" {
+		ports, err := serial.GetPortsList()
+		if err != nil {
+			log.Fatal(err)
+		}
+		if len(ports) == 0 {
+			log.Fatal("No serial ports found!")
+		}
 
-		comName := "/dev/ttyUSB" + strconv.Itoa(iComPort)
+		for _, port := range ports {
+			fmt.Printf("Found port: %v\n", port)
+		}
+		return
+	} else if sComPort != "" {
+		log.Println("use com port with name", sComPort)
+
+		comName := sComPort
 		mode := &serial.Mode{
 			BaudRate: iBaudRate,
 			DataBits: iDataBits,
@@ -90,6 +105,3 @@ func setStopBits(stopBits int) (serialStopBits serial.StopBits) {
 	}
 	return
 }
-
-
-*/
